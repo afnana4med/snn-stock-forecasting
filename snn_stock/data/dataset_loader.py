@@ -63,6 +63,9 @@ class PriceDataset(Dataset):
         # For 'window' normalization: per-sample (target_min, target_span,
         # last_close) so predictions can be mapped back to price units
         self.window_meta = []
+        # Raw (un-normalized) close-price window per sample, used by the
+        # linear-trend / drift baseline at evaluation time
+        self.close_windows = []
         self.data = self._load_and_process_data()
 
     def _add_engineered_features(self, df, features):
@@ -175,6 +178,8 @@ class PriceDataset(Dataset):
                         y = np.array([(future_close - t_min) / t_span],
                                      dtype=np.float32)
                     self.window_meta.append((t_min, t_span, last_close))
+                    self.close_windows.append(
+                        raw_target[i:i + seq, 0].astype(np.float64))
                 else:
                     y = np.array([target_values[i + seq + hor - 1]],
                                  dtype=np.float32)

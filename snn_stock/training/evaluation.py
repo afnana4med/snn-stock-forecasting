@@ -77,6 +77,26 @@ def fit_predict_ridge(X_train, y_train, X_test):
     return model.predict(X_test.reshape(len(X_test), -1))
 
 
+def predict_trend_delta(close_windows, horizon, t_spans):
+    """Linear-trend (drift) baseline in delta-target units.
+
+    Fits a straight line to each window's close prices and extrapolates
+    `horizon` steps past the window end. The predicted move relative to the
+    last close, divided by the window span, is the delta-target prediction.
+    This is the natural competitor to persistence at long horizons: if a
+    trend genuinely persists, drift extrapolation beats "no change".
+    """
+    n_win, seq_len = close_windows.shape
+    t = np.arange(seq_len)
+    preds = np.empty(n_win, dtype=np.float64)
+    for i in range(n_win):
+        slope, intercept = np.polyfit(t, close_windows[i], 1)
+        last_close = close_windows[i, -1]
+        extrap = intercept + slope * (seq_len - 1 + horizon)
+        preds[i] = (extrap - last_close) / t_spans[i]
+    return preds
+
+
 def fit_predict_lstm(X_train, y_train, X_test, seed=42, hidden=32,
                      epochs=150, patience=15):
     import torch
@@ -267,6 +287,8 @@ def run_final_evaluation(config, seeds=(42, 123, 777), n_folds=4,
 
     meta = np.asarray(dataset.window_meta[:n])
     t_span, last_close = meta[:, 1], meta[:, 2]
+    close_windows = np.stack(dataset.close_windows[:n])
+    horizon = config["data"]["prediction_horizon"]
 
     folds = walk_forward_folds(n, n_folds=n_folds)
     logging.info(f"🏁 Final evaluation: {n} windows, {n_folds} folds, "
@@ -274,7 +296,7 @@ def run_final_evaluation(config, seeds=(42, 123, 777), n_folds=4,
                  f"{spike_arrays.shape[-1]} input neurons")
 
     all_test_idx = np.concatenate([te for _, te in folds])
-    preds = {"snn": [], "ridge": [], "lstm": []}
+    preds = {"snn": [], "ridge": [], "lstm": [], "trend": []}
     spike_stats = None
 
     for k, (tr, te) in enumerate(folds):
@@ -296,6 +318,9 @@ def run_final_evaluation(config, seeds=(42, 123, 777), n_folds=4,
                                                 X_windows[te]))
         preds["lstm"].append(fit_predict_lstm(X_windows[tr], y[tr].ravel(),
                                               X_windows[te]))
+        # Linear-trend / drift baseline needs no training
+        preds["trend"].append(predict_trend_delta(
+            close_windows[te], horizon, t_span[te]))
         logging.info(f"  fold {k + 1}/{n_folds}: baselines done")
 
     # Pool folds and convert everything to dollars
@@ -317,7 +342,7 @@ def run_final_evaluation(config, seeds=(42, 123, 777), n_folds=4,
             "rmse_dollars": float(np.sqrt(np.mean(err ** 2))),
             "mae_dollars": float(np.mean(np.abs(err))),
         }
-    for name in ("persistence", "ridge", "lstm"):
+    for name in ("persistence", "trend", "ridge", "lstm"):
         dm, p = diebold_mariano(dollar_errors["snn"], dollar_errors[name])
         results["dm_tests"][f"snn_vs_{name}"] = {
             "dm_statistic": dm, "p_value": p,
