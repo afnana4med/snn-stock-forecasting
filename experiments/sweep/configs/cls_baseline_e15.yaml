@@ -1,0 +1,42 @@
+algorithm: eventprop
+data:
+  encoding: temporal
+  features:
+  - Open
+  - High
+  - Low
+  - Close
+  - Volume
+  files:
+  - data/processed/daily_AAPL.csv
+  normalize: window
+  prediction_horizon: 1
+  sequence_length: 20
+  target_column: Close
+device: cuda
+dt: 1.0
+experiment_name: cls_baseline_e15
+logging:
+  log_interval: 1
+  save_dir: /Users/afnanahmed/Desktop/stock_prediction_snn_updated 3/experiments/sweep
+max_samples: 1500
+model:
+  hidden_layers:
+  - units: 32
+  neuron_model: LIF
+  neuron_params:
+    refractory_period: 1.0
+    tau_mem: 20.0
+    tau_syn: 5.0
+    threshold: 1.0
+  output_neurons: 2
+  output_readout: avg_var
+n_steps: 50
+task: classification
+training:
+  batch_size: 8
+  epochs: 15
+  learning_rate: 0.005
+  optimiser: adam
+  random_seed: 42
+  validation_split: 0.2

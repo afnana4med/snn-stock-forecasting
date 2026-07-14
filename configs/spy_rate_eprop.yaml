@@ -1,0 +1,39 @@
+experiment_name: "snn_rate_eprop_spy"
+task: "regression"
+algorithm: "eprop"
+n_steps: 40
+dt: 1.0
+max_samples: null     # use every available window
+device: "cuda"        # falls back to CPU automatically if CUDA is missing
+
+data:
+  files: ["data/raw/sp500_etf_daily.csv"]
+  features: ["Open", "High", "Low", "Close", "Volume"]
+  target_column: "Close"
+  sequence_length: 20
+  prediction_horizon: 1
+  normalize: "window"
+  encoding: "rate"
+
+model:
+  neuron_model: "LIF"
+  neuron_params:
+    threshold: 0.4
+    tau_mem: 20.0
+    tau_syn: 5.0
+    refractory_period: 1.0
+  hidden_layers: [{"units": 32}]
+  output_neurons: 1
+  output_readout: "var"
+
+training:
+  epochs: 15
+  batch_size: 8          # forced to 1 on the CPU backend
+  learning_rate: 0.005
+  optimiser: "adam"
+  random_seed: 42
+  validation_split: 0.2
+
+logging:
+  save_dir: "experiments/rate_eprop"
+  log_interval: 1

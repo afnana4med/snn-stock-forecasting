@@ -1,0 +1,21 @@
+# Core ML GeNN dependencies
+# NOTE: on Linux/Windows `pip install pygenn` works directly. On macOS there
+# are no prebuilt wheels - build GeNN from source instead:
+#   git clone https://github.com/genn-team/genn.git && pip install ./genn
+# ml_genn is installed from the GeNN team's repository:
+#   git clone https://github.com/genn-team/ml_genn.git && pip install ./ml_genn/ml_genn
+pygenn>=5.1.0,<6.0.0
+ml_genn>=2.3.0
+tqdm>=4.27.0
+
+# Data processing and analysis
+numpy>=1.19.2
+pandas>=1.1.3
+scikit-learn>=0.23.2
+matplotlib>=3.3.2
+pyyaml>=5.3.1
+torch>=1.13
+
+# Stock data fetching
+yfinance>=0.1.63
+beautifulsoup4>=4.9.3

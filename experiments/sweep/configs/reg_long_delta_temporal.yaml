@@ -1,0 +1,45 @@
+algorithm: eprop
+data:
+  encoding: temporal
+  features:
+  - Open
+  - High
+  - Low
+  - Close
+  - Volume
+  files:
+  - data/processed/daily_AAPL.csv
+  normalize: window
+  prediction_horizon: 1
+  sequence_length: 20
+  target_column: Close
+  target_mode: delta
+device: cuda
+dt: 1.0
+experiment_name: reg_long_delta_temporal
+logging:
+  log_interval: 1
+  save_dir: /Users/afnanahmed/Desktop/stock_prediction_snn_updated 3/experiments/sweep
+max_samples: 1500
+model:
+  hidden_layers:
+  - units: 64
+  neuron_model: LIF
+  neuron_params:
+    refractory_period: 1.0
+    tau_mem: 20.0
+    tau_syn: 5.0
+    threshold: 0.4
+  output_neurons: 1
+  output_readout: var
+n_steps: 50
+task: regression
+training:
+  batch_size: 8
+  epochs: 40
+  learning_rate: 0.005
+  lr_decay: 0.7
+  lr_decay_every: 10
+  optimiser: adam
+  random_seed: 42
+  validation_split: 0.2

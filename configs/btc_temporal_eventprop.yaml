@@ -1,0 +1,39 @@
+experiment_name: "snn_temporal_eventprop_btc_classification"
+task: "classification"  # predict next-day price direction (0=down, 1=up)
+algorithm: "eventprop"
+n_steps: 50
+dt: 1.0
+max_samples: null     # use every available window
+device: "cuda"        # falls back to CPU automatically if CUDA is missing
+
+data:
+  files: ["data/raw/bitcoin_daily.csv"]
+  features: ["Open", "High", "Low", "Close", "Volume"]
+  target_column: "Close"
+  sequence_length: 20
+  prediction_horizon: 1
+  normalize: "window"
+  encoding: "temporal"
+
+model:
+  neuron_model: "LIF"
+  neuron_params:
+    threshold: 1.0
+    tau_mem: 20.0
+    tau_syn: 5.0
+    refractory_period: 1.0
+  hidden_layers: [{"units": 32}]
+  output_neurons: 2      # two classes: up (1) or down (0)
+  output_readout: "avg_var"
+
+training:
+  epochs: 15
+  batch_size: 8          # forced to 1 on the CPU backend
+  learning_rate: 0.005
+  optimiser: "adam"
+  random_seed: 42
+  validation_split: 0.2
+
+logging:
+  save_dir: "experiments/temporal_eventprop"
+  log_interval: 1

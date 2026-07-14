@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+
+# GeNN generated model code (recreated on every compile)
+*_CODE/
+
+# macOS
+.DS_Store
+
+# Experiment outputs
+experiments/*/*/checkpoints/
+experiments/*/*_20[0-9][0-9]*/
+logs/
+cache/
+
+# Large data files (>100MB, exceed GitHub limits) - the daily dataset
+# is included; regenerate the minute-level files if needed
+data/processed/cleaned_AAPL_1min.csv
+data/raw/AAPL_1min/
