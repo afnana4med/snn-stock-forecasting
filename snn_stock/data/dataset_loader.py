@@ -15,6 +15,8 @@ class PriceDataset(Dataset):
                  target_column='Close',
                  normalize=True,  # False, True/'global', or 'window'
                  target_mode='level',  # 'level' or 'delta' (window mode only)
+                 engineered_features=False,  # add returns/volatility/volume features
+                 context_files=None,  # other assets whose returns are appended
                  scaler_fit_fraction=0.8,
                  use_cache=False,
                  cache_dir='./cache'):
@@ -36,6 +38,11 @@ class PriceDataset(Dataset):
         if target_mode == 'delta' and normalize != 'window':
             raise ValueError("target_mode 'delta' requires normalize='window'")
         self.target_mode = target_mode
+        self.engineered_features = engineered_features
+        self.context_files = list(context_files) if context_files else []
+        # Filled per file: the feature columns actually used (base features
+        # plus any engineered/context columns)
+        self.effective_features = list(features)
 
         self.file_paths = file_paths
         self.sequence_length = sequence_length
@@ -58,6 +65,33 @@ class PriceDataset(Dataset):
         self.window_meta = []
         self.data = self._load_and_process_data()
 
+    def _add_engineered_features(self, df, features):
+        """Daily return, rolling volatility, volume ratio, high-low range."""
+        close = df[self.target_column]
+        df['Return'] = close.pct_change()
+        df['Volatility'] = df['Return'].rolling(10).std()
+        features += ['Return', 'Volatility']
+        if 'Volume' in df.columns:
+            vol_mean = df['Volume'].rolling(10).mean()
+            df['VolumeRatio'] = df['Volume'] / vol_mean.replace(0, np.nan)
+            features.append('VolumeRatio')
+        if 'High' in df.columns and 'Low' in df.columns:
+            df['HLRange'] = (df['High'] - df['Low']) / close
+            features.append('HLRange')
+        return df, features
+
+    def _merge_context_assets(self, df, features):
+        """Append other assets' daily returns as extra feature columns."""
+        df['Date'] = pd.to_datetime(df['Date']).dt.normalize()
+        for i, cf in enumerate(self.context_files):
+            cdf = pd.read_csv(cf)
+            cdf['Date'] = pd.to_datetime(cdf['Date']).dt.normalize()
+            col = f'Ctx{i}_Return'
+            cdf[col] = cdf['Close'].pct_change()
+            df = df.merge(cdf[['Date', col]], on='Date', how='inner')
+            features.append(col)
+        return df, features
+
     def _load_and_process_data(self):
         all_sequences = []
         for file_path in self.file_paths:
@@ -68,7 +102,16 @@ class PriceDataset(Dataset):
             for col in required_columns:
                 if col not in df.columns:
                     raise ValueError(f"Missing required column: {col}")
-            df = df.dropna(subset=list(required_columns)).reset_index(drop=True)
+
+            features = list(self.features)
+            if self.context_files:
+                df, features = self._merge_context_assets(df, features)
+            if self.engineered_features:
+                df, features = self._add_engineered_features(df, features)
+            self.effective_features = features
+
+            df = df.dropna(subset=list(set(features + [self.target_column])))
+            df = df.reset_index(drop=True)
 
             # Keep the raw target so the target scaler is not applied on top
             # of already-scaled feature values (the target column usually
@@ -79,8 +122,8 @@ class PriceDataset(Dataset):
             if self.normalize and not window_normalize:
                 fit_rows = max(int(len(df) * self.scaler_fit_fraction), 2)
                 feature_scaler = MinMaxScaler()
-                feature_scaler.fit(df[self.features].iloc[:fit_rows])
-                feature_values = feature_scaler.transform(df[self.features])
+                feature_scaler.fit(df[features].iloc[:fit_rows])
+                feature_values = feature_scaler.transform(df[features])
 
                 target_scaler = MinMaxScaler()
                 target_scaler.fit(raw_target[:fit_rows])
@@ -89,7 +132,7 @@ class PriceDataset(Dataset):
                 self.scalers['features'] = feature_scaler
                 self.scalers['target'] = target_scaler
             else:
-                feature_values = df[self.features].to_numpy(dtype=np.float64)
+                feature_values = df[features].to_numpy(dtype=np.float64)
                 target_values = raw_target.ravel()
 
             seq, hor = self.sequence_length, self.prediction_horizon

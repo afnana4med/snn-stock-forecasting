@@ -10,7 +10,8 @@ from ml_genn.connectivity import Dense
 
 
 def build_snn(input_size, hidden_layers, output_size, neuron_params,
-              output_readout="var", algorithm="eprop", max_input_spikes=None):
+              output_readout="var", algorithm="eprop", max_input_spikes=None,
+              recurrent=False):
     """
     Builds a spiking neural network (SNN) using the mlGeNN framework.
 
@@ -79,6 +80,17 @@ def build_snn(input_size, hidden_layers, output_size, neuron_params,
             Connection(previous_layer, hidden_pop,
                        Dense(hidden_weight_init(prev_units)),
                        synapse_factory())
+
+            if recurrent:
+                # Recurrent hidden connectivity (RSNN) - both e-prop and
+                # EventProp support this; init small so early dynamics are
+                # dominated by the feed-forward drive
+                if algorithm == "eventprop":
+                    rec_init = Normal(mean=0.0, sd=0.02)
+                else:
+                    rec_init = Normal(sd=1.0 / np.sqrt(hidden_units))
+                Connection(hidden_pop, hidden_pop, Dense(rec_init),
+                           synapse_factory())
 
             hidden_pops.append(hidden_pop)
             previous_layer = hidden_pop

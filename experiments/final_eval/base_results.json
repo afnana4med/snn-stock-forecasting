@@ -1,0 +1,57 @@
+{
+  "n_test_predictions": 1500,
+  "n_folds": 4,
+  "seeds": [
+    42,
+    123,
+    777
+  ],
+  "models": {
+    "snn": {
+      "rmse_dollars": 0.23043501775011116,
+      "mae_dollars": 0.14946912189836872,
+      "directional_accuracy": 0.472
+    },
+    "ridge": {
+      "rmse_dollars": 0.2112593994557499,
+      "mae_dollars": 0.12745613015708948,
+      "directional_accuracy": 0.536
+    },
+    "lstm": {
+      "rmse_dollars": 0.20047819746136675,
+      "mae_dollars": 0.11875483941076466,
+      "directional_accuracy": 0.5653333333333334
+    },
+    "persistence": {
+      "rmse_dollars": 0.19900583299980926,
+      "mae_dollars": 0.11792431189906165,
+      "directional_accuracy": 0.572
+    }
+  },
+  "dm_tests": {
+    "snn_vs_persistence": {
+      "dm_statistic": 7.988018593979256,
+      "p_value": 2.6645352591003757e-15,
+      "interpretation": "snn worse (significant)"
+    },
+    "snn_vs_ridge": {
+      "dm_statistic": 4.563408763649862,
+      "p_value": 5.443661582393844e-06,
+      "interpretation": "snn worse (significant)"
+    },
+    "snn_vs_lstm": {
+      "dm_statistic": 9.255055247309635,
+      "p_value": 0.0,
+      "interpretation": "snn worse (significant)"
+    }
+  },
+  "efficiency": {
+    "input_spikes_per_example": 100.0,
+    "hidden_spikes_per_example": 0.14933333333333335,
+    "synaptic_events_per_prediction": 3200.1493333333333,
+    "neuron_updates_per_prediction": 1650.0,
+    "lstm_macs_per_prediction": 94752.0,
+    "ridge_macs_per_prediction": 100.0,
+    "snn_total_ops_per_prediction": 4850.149333333333
+  }
+}

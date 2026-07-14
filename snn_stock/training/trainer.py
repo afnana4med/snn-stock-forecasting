@@ -13,6 +13,7 @@ from ml_genn.serialisers import Numpy
 from snn_stock.data.dataset_loader import PriceDataset
 from snn_stock.encoders.rate_coding import RateEncoder
 from snn_stock.encoders.temporal_coding import TemporalEncoder
+from snn_stock.encoders.temporal_contrast import TemporalContrastEncoder
 from snn_stock.models.snn_model import build_snn
 from snn_stock.utils import convert_rate_to_spike_times
 from snn_stock.utils.visualization import (plot_loss_curves, plot_predictions,
@@ -61,6 +62,8 @@ def get_encoder(config):
                            dt=config.get("dt", 1.0))
     elif encoding_type == "temporal":
         return TemporalEncoder(n_steps=n_steps)
+    elif encoding_type == "contrast":
+        return TemporalContrastEncoder(n_steps=n_steps)
     else:
         raise ValueError(f"Unsupported encoding type: {encoding_type}")
 
@@ -126,7 +129,9 @@ def run_training(config):
         features=config["data"]["features"],
         target_column=config["data"].get("target_column", "Close"),
         normalize=config["data"]["normalize"],
-        target_mode=target_mode)
+        target_mode=target_mode,
+        engineered_features=config["data"].get("engineered_features", False),
+        context_files=config["data"].get("context_files"))
     logging.info(f"✅ Dataset loaded with {len(dataset)} samples.")
 
     encoder = get_encoder(config)
@@ -188,7 +193,8 @@ def run_training(config):
         neuron_params=config["model"]["neuron_params"],
         output_readout=output_readout,
         algorithm=algorithm,
-        max_input_spikes=max_input_spikes)
+        max_input_spikes=max_input_spikes,
+        recurrent=config["model"].get("recurrent", False))
 
     if task == "classification":
         loss = "sparse_categorical_crossentropy"

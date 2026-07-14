@@ -147,16 +147,75 @@ to the other assets:
 | SPY (2024–2026 held out) | **5.899** | 5.921 | beats baseline (untuned level model: 13.8) |
 | BTC-USD (2023–2026 held out) | 1973.98 | 1973.15 | statistical tie |
 
+## Final rigorous evaluation (walk-forward + significance + baselines)
+
+`python scripts/run_final_eval.py` runs the gold-standard protocol and writes
+results and figures to `experiments/final_eval/`:
+
+- **Expanding-window walk-forward** cross-validation (4 folds — always train on
+  the past, test on the future; no look-ahead leakage)
+- **3-seed ensemble** per fold (predictions averaged over seeds 42/123/777)
+- **Diebold–Mariano** significance test on every model comparison
+- **Classical baselines on identical inputs**: persistence, ridge regression,
+  and an early-stopped **LSTM** (PyTorch)
+- **Computational-cost accounting**: SNN synaptic events + neuron updates vs
+  LSTM/ridge multiply-accumulates (MACs)
+
+Four ablations on AAPL daily (1,500 pooled test predictions), delta target:
+
+| Variant | SNN RMSE ($) | Persistence | Ridge | LSTM | SNN vs best baseline (DM) |
+|---|---|---|---|---|---|
+| base (OHLCV, TTFS code) | 0.230 | **0.199** | 0.211 | 0.201 | worse, p<0.001 |
+| + engineered features | 0.214 | **0.199** | 0.214 | 0.201 | ties ridge (p=0.98), worse than persistence |
+| + SPY context + recurrent (RSNN)¹ | 3.844 | **2.300** | 2.528 | 2.322 | worse, p<0.001 |
+| temporal-contrast code | 0.214 | **0.199** | 0.214 | 0.201 | ties ridge (p=0.98) |
+
+¹ The context variant inner-joins with SPY (data starts 2015), so it runs on a
+later, higher-priced period — its dollar RMSE is **not** comparable to the other
+rows, only to its own baselines.
+
+### The headline result: efficiency, not accuracy
+
+`experiments/final_eval/final_efficiency_comparison.png`
+
+| Model | Operations per prediction | Relative |
+|---|---|---|
+| **SNN (e-prop)** | **4,850** (3,200 synaptic events + 1,650 neuron updates) | **1×** |
+| LSTM | 94,752 MACs | 20× more |
+| Ridge | 100 MACs | (a trivial linear model) |
+
+**Conclusions:**
+
+1. **On accuracy, no model beats persistence** on daily prices — the SNN, LSTM
+   and ridge all lose to "tomorrow = today" by a statistically significant
+   margin (DM p<0.001). This is the textbook signature of a near-efficient
+   market and is the honest, defensible finding.
+2. **With engineered features (returns, volatility, volume ratio, high–low
+   range) the SNN matches ridge regression** (DM p=0.98, i.e. no significant
+   difference) — so the spiking model learns a linear-quality mapping from
+   spike-encoded inputs.
+3. **The SNN's real advantage is compute**: it produces each forecast with
+   ~20× fewer operations than the matched LSTM, exactly the energy/latency
+   argument that motivates SNNs for high-frequency settings.
+4. Engineered features lifted SNN direction accuracy from 0.47 → 0.51 and
+   halved the gap to persistence; the recurrent + context variant did not help
+   on the shorter, harder later period.
+
 ## Project layout
 
 ```
 snn_stock/
-  data/dataset_loader.py    sliding-window dataset, per-window or global scaling
-  encoders/                 rate & time-to-first-spike encoders -> (T, neurons)
-  models/snn_model.py       SpikeInput -> LIF hidden -> LeakyIntegrate readout
+  data/dataset_loader.py    sliding-window dataset; per-window/global scaling,
+                            delta targets, engineered features, multi-asset context
+  encoders/                 rate, time-to-first-spike, temporal-contrast encoders
+  models/snn_model.py       SpikeInput -> LIF hidden (optionally recurrent) -> readout
   training/trainer.py       compile, train, checkpoint, evaluate, plot
+  training/evaluation.py    walk-forward + multi-seed + DM test + ridge/LSTM baselines
   utils/                    spike-format conversion, visualization
 configs/                    one YAML per experiment
 scripts/create_test_dataset.py  builds test + daily datasets
+scripts/fetch_market_data.py    downloads multi-asset daily OHLCV via yfinance
+scripts/run_experiments.py      hyperparameter sweep runner
+scripts/run_final_eval.py       rigorous walk-forward evaluation vs baselines
 tests/                      unit tests (python -m unittest discover tests)
 ```
